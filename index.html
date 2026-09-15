@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101310">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="trackmidolla">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<title>trackmidolla</title>
+<style>
+:root{--bg:#101310;--panel:#171b17;--lime:#b7ff38;--muted:#77846f;--red:#ff6868;--line:#2b3829}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--lime);font-family:monospace}
+.app{max-width:720px;margin:auto;padding:22px 15px 70px}.top{display:flex;justify-content:space-between;align-items:center}
+.brand{font-size:25px}.tag{font-size:12px;margin-top:5px}.rule{border-top:1px solid var(--line);margin:18px 0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.card,.form,.bank,.importbox{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:13px}
+.card b{display:block;margin-top:7px;font-size:17px}.muted,label{color:var(--muted);font-size:11px}
+button,input,select{font:inherit;color:var(--lime);background:#111511;border:1px solid #3c4d38;border-radius:5px;padding:11px}
+button{cursor:pointer}.primary{width:100%;margin:14px 0;border-color:var(--lime);padding:14px}
+.tabs{display:flex;gap:5px;overflow:auto;margin:15px 0}.tabs button{white-space:nowrap}.active{background:var(--lime);color:#101310}
+.form{display:grid;gap:9px;margin:12px 0}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tx{display:flex;gap:9px;align-items:center;border-bottom:1px solid var(--line);padding:12px 0}.txmain{flex:1;min-width:0}
+.txmain b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.txmain small{display:block;color:var(--muted);margin-top:4px}
+.amt{white-space:nowrap}.expense{color:var(--red)}.uncat{color:#d9ff78}
+.actions{display:flex;gap:5px;margin:10px 0;flex-wrap:wrap}.actions button{flex:1;min-width:100px}
+.danger{color:var(--red);border-color:var(--red)}.bank{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+.bank small{display:block;color:var(--muted);margin-top:4px}.notice{color:var(--muted);border:1px dashed #50634b;padding:12px;font-size:11px;line-height:1.5}
+.importbox{margin:12px 0}.import-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.import-actions button{width:100%}.file-input{display:none}.small{font-size:10px;color:var(--muted);line-height:1.5;margin-top:10px}
+.hidden{display:none}.version{color:#50634b;font-size:9px;text-align:center;margin-top:25px}
+@media(max-width:560px){.grid,.row{grid-template-columns:1fr}.import-actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div><div class="brand">trackmidolla</div><div class="tag">check yo moniez yo!</div></div>
+    <button type="button" onclick="toggleBanks()">BANKS</button>
+  </div>
+  <div class="rule"></div>
+
+  <div class="grid">
+    <div class="card"><span class="muted">BUSINESS</span><b id="business">£0.00</b></div>
+    <div class="card"><span class="muted">PERSONAL</span><b id="personal">£0.00</b></div>
+    <div class="card"><span class="muted">EXPENSES</span><b id="expenses">£0.00</b></div>
+  </div>
+
+  <button class="primary" type="button" onclick="openForm()">+ ADD TRANSACTION</button>
+
+  <div id="banks" class="hidden">
+    <div class="importbox">
+      <b>IMPORT BANK CSV</b>
+      <div class="small">Export your transactions from Monzo or Lloyds, then choose the matching button. Imported transactions start as UNSORTED so you can bulk-categorise them.</div>
+      <div class="import-actions">
+        <button type="button" onclick="chooseCsv('Monzo')">IMPORT MONZO</button>
+        <button type="button" onclick="chooseCsv('Lloyds Bank')">IMPORT LLOYDS</button>
+      </div>
+      <input id="csvFile" class="file-input" type="file" accept=".csv,text/csv">
+    </div>
+  </div>
+
+  <div id="editor" class="form hidden">
+    <h3 id="editorTitle">ADD TRANSACTION</h3>
+    <label for="desc">WHAT WAS IT?</label>
+    <input id="desc" placeholder="e.g. fuel">
+    <label for="amount">AMOUNT (£)</label>
+    <input id="amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+    <div class="row">
+      <div><label for="date">DATE</label><input id="date" type="date"></div>
+      <div><label for="type">TYPE</label>
+        <select id="type"><option value="business">BUSINESS</option><option value="personal">PERSONAL</option><option value="expenses">EXPENSES</option><option value="unsorted">UNSORTED</option></select>
+      </div>
+    </div>
+    <label for="bank">BANK</label>
+    <select id="bank"><option value="">MANUAL</option><option>Monzo</option><option>Lloyds Bank</option></select>
+    <div class="actions">
+      <button type="button" onclick="saveTx()">SAVE</button>
+      <button type="button" onclick="closeForm()">CANCEL</button>
+      <button id="deleteEdit" class="danger hidden" type="button" onclick="deleteEditing()">DELETE</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button type="button" data-filter="all" onclick="setFilter('all')">ALL</button>
+    <button type="button" data-filter="unsorted" onclick="setFilter('unsorted')">UNSORTED</button>
+    <button type="button" data-filter="business" onclick="setFilter('business')">BUSINESS</button>
+    <button type="button" data-filter="personal" onclick="setFilter('personal')">PERSONAL</button>
+    <button type="button" data-filter="expenses" onclick="setFilter('expenses')">EXPENSES</button>
+  </div>
+
+  <div id="bulk" class="actions hidden">
+    <button type="button" onclick="bulkType('business')">BUSINESS</button>
+    <button type="button" onclick="bulkType('personal')">PERSONAL</button>
+    <button type="button" onclick="bulkType('expenses')">EXPENSES</button>
+    <button class="danger" type="button" onclick="bulkDelete()">DELETE</button>
+  </div>
+
+  <div id="list"></div>
+  <div class="version">TRACKMIDOLLA • V7 • LOCAL ONLY</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const KEY='trackmidolla_v7';
+let txs=[], filter='all', editingId=null, importBank='';
+
+function byId(id){return document.getElementById(id)}
+function load(){
+  try{
+    const raw=localStorage.getItem(KEY) || localStorage.getItem('trackmidolla_v6') || localStorage.getItem('trackmidolla_v5') || '[]';
+    const parsed=JSON.parse(raw);
+    txs=Array.isArray(parsed)?parsed:[];
+  }catch(e){txs=[]}
+}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(txs))}catch(e){}}
+function money(n){return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(n)||0)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function typeName(t){return ({business:'BUSINESS',personal:'PERSONAL',expenses:'EXPENSES',unsorted:'UNSORTED'})[t]||'UNSORTED'}
+
+window.toggleBanks=function(){byId('banks').classList.toggle('hidden')}
+window.openForm=function(id){
+  editingId=id||null;
+  byId('editorTitle').textContent=id?'EDIT TRANSACTION':'ADD TRANSACTION';
+  const del=byId('deleteEdit');
+  if(id){
+    const t=txs.find(x=>x.id===id); if(!t)return;
+    byId('desc').value=t.desc||''; byId('amount').value=t.amount??''; byId('date').value=t.date||'';
+    byId('type').value=t.type||'unsorted'; byId('bank').value=t.bank||''; del.classList.remove('hidden');
+  }else{
+    byId('desc').value=''; byId('amount').value=''; byId('date').value=new Date().toISOString().slice(0,10);
+    byId('type').value='business'; byId('bank').value=''; del.classList.add('hidden');
+  }
+  byId('editor').classList.remove('hidden');
+  byId('desc').focus();
+}
+window.closeForm=function(){editingId=null;byId('editor').classList.add('hidden')}
+window.saveTx=function(){
+  const desc=byId('desc').value.trim(), amount=Number(byId('amount').value);
+  if(!desc || !Number.isFinite(amount)){alert('Please enter a description and amount.');return}
+  const data={desc,amount,date:byId('date').value||new Date().toISOString().slice(0,10),type:byId('type').value,bank:byId('bank').value};
+  if(editingId){const i=txs.findIndex(x=>x.id===editingId);if(i>=0)txs[i]={...txs[i],...data}}
+  else txs.unshift({id:'m_'+Date.now()+'_'+Math.random().toString(36).slice(2),...data});
+  persist();closeForm();render();
+}
+window.deleteEditing=function(){
+  if(!editingId)return;
+  if(confirm('Delete this transaction?')){txs=txs.filter(x=>x.id!==editingId);persist();closeForm();render()}
+}
+window.setFilter=function(f){filter=f;render()}
+window.toggleSelect=function(id,checked){const t=txs.find(x=>x.id===id);if(t)t.selected=checked;updateBulk()}
+function selected(){return txs.filter(t=>t.selected)}
+window.bulkType=function(type){
+  const s=selected(); if(!s.length)return;
+  s.forEach(t=>{t.type=type;t.selected=false});persist();render()
+}
+window.bulkDelete=function(){
+  const s=selected(); if(!s.length)return;
+  if(confirm('Delete '+s.length+' selected transaction(s)?')){const ids=new Set(s.map(t=>t.id));txs=txs.filter(t=>!ids.has(t.id));persist();render()}
+}
+function updateBulk(){
+  const n=selected().length; byId('bulk').classList.toggle('hidden',n===0); renderTabsOnly()
+}
+function renderTabsOnly(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.filter===filter))
+}
+function render(){
+  const sums={business:0,personal:0,expenses:0};
+  txs.forEach(t=>{if(sums[t.type]!=null)sums[t.type]+=Number(t.amount)||0});
+  byId('business').textContent=money(sums.business);byId('personal').textContent=money(sums.personal);byId('expenses').textContent=money(sums.expenses);
+  renderTabsOnly();
+  const visible=filter==='all'?txs:txs.filter(t=>t.type===filter);
+  byId('list').innerHTML=visible.length?visible.map(t=>`
+    <div class="tx">
+      <input type="checkbox" ${t.selected?'checked':''} onchange="toggleSelect('${esc(t.id)}',this.checked)">
+      <div class="txmain" onclick="openForm('${esc(t.id)}')">
+        <b>${esc(t.desc)}</b>
+        <small>${esc(t.date||'')} • ${esc(t.bank||'MANUAL')} • <span class="${t.type==='unsorted'?'uncat':''}">${typeName(t.type)}</span></small>
+      </div>
+      <div class="amt ${t.type==='expenses'?'expense':''}">${money(t.amount)}</div>
+    </div>`).join(''):'<div class="notice">NO TRANSACTIONS YET.<br><br>Tap + ADD TRANSACTION to get started.</div>';
+  updateBulk()
+}
+function chooseCsv(bank){
+  importBank=bank;byId('csvFile').value='';byId('csvFile').click()
+}
+byId('csvFile').addEventListener('change',function(){
+  const file=this.files&&this.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>importCsv(String(reader.result||''),importBank);
+  reader.readAsText(file);
+});
+function splitCsvLine(line){
+  const out=[];let cur='',q=false;
+  for(let i=0;i<line.length;i++){const c=line[i];
+    if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++}else q=!q}
+    else if(c===','&&!q){out.push(cur);cur=''}else cur+=c;
+  }out.push(cur);return out
+}
+function importCsv(text,bank){
+  const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(x=>x.trim());
+  if(lines.length<2){alert('That CSV looks empty.');return}
+  const headers=splitCsvLine(lines[0]).map(x=>x.trim().toLowerCase());
+  const find=(names)=>headers.findIndex(h=>names.some(n=>h===n||h.includes(n)));
+  const di=find(['description','details','reference','merchant','name','memo']);
+  const ai=find(['amount','value','transaction amount']);
+  const datei=find(['date','transaction date','completed date']);
+  if(di<0||ai<0){alert('I could not identify the description and amount columns in this CSV.');return}
+  const existing=new Set(txs.map(t=>[t.date,t.desc,t.amount,t.bank].join('|')));
+  let added=0;
+  for(let i=1;i<lines.length;i++){
+    const p=splitCsvLine(lines[i]); if(!p.length)continue;
+    const desc=(p[di]||'Imported transaction').trim();
+    const raw=(p[ai]||'').replace(/[£,\s]/g,'');
+    const amount=Math.abs(Number(raw));
+    if(!desc||!Number.isFinite(amount))continue;
+    const date=datei>=0?(p[datei]||'').trim():new Date().toISOString().slice(0,10);
+    const key=[date,desc,amount,bank].join('|'); if(existing.has(key))continue;
+    existing.add(key);
+    txs.unshift({id:'i_'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2),desc,amount,date,type:'unsorted',bank});
+    added++;
+  }
+  persist();render();alert(added+' transaction(s) imported from '+bank+'.')
+}
+load();render();
+})();
+</script>
+</body>
+</html>
